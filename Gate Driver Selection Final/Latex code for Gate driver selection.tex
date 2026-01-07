@@ -1,0 +1,125 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{amsmath}
+\usepackage{siunitx}
+\usepackage{geometry}
+\usepackage{setspace}
+
+\geometry{margin=2.5cm}
+\onehalfspacing
+
+\title{Evaluation of the TLP250 Optocoupler as a Gate Driver for the IXFH80N65X2 MOSFET}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+This report presents a detailed technical evaluation of the TLP250 optocoupler used as a gate driver for the IXFH80N65X2 power MOSFET. The system operates at a switching frequency ($f_{sw}$) of $\SI{2}{kHz}$ with a duty cycle of $0.85$. The MOSFET is operated in a high-side switching configuration, which introduces specific requirements for gate-drive referencing and power supply isolation. The design aims to ensure reliable gate drive operation, correct grounding behavior, acceptable switching performance, and safe operation of both the gate driver and the power device.
+
+\section{Component and Supply Parameters}
+
+\subsection{MOSFET: IXFH80N65X2}
+
+\begin{itemize}
+    \item Drain--source voltage rating: $V_{DSS} = \SI{650}{V}$
+    \item Continuous drain current at $25^\circ\text{C}$: $I_{D25} = \SI{80}{A}$
+    \item Gate threshold voltage: $V_{GS(th)} = 3.5\text{--}5.0\,\text{V}$
+    \item Gate-to-source charge: $Q_{gs} \approx \SI{50}{nC}$
+    \item Gate-to-drain (Miller) charge: $Q_{gd} \approx \SI{40}{nC}$
+    \item Total gate charge (datasheet, $V_{GS}=10\,\text{V}$):
+    \[
+        Q_g \approx \SI{140}{nC}
+    \]
+\end{itemize}
+
+\subsection{Gate Driver: TLP250}
+
+\begin{itemize}
+    \item Maximum peak output current: $I_O = \pm \SI{1.5}{A}$
+    \item Maximum input threshold current: $I_{FLH} = \SI{5}{mA}$
+    \item Typical LED forward voltage: $V_F \approx \SI{1.6}{V}$
+\end{itemize}
+
+\section{Need for an Isolated DC--DC Converter}
+
+\subsection{Grounding Problem in High-Side Switching}
+
+In a high-side switching topology, the source terminal of the MOSFET is not connected to the system ground. Instead, it is tied to the switching node, whose voltage varies dynamically between the supply voltage and the load voltage during operation. As a result, the source potential is not fixed and may experience large and fast voltage transitions.
+
+Gate control of a MOSFET is defined by the gate-to-source voltage ($V_{GS}$), not the gate-to-ground voltage. If a non-isolated gate driver supply referenced to system ground were used, the gate driver would be unable to maintain a constant and well-defined $V_{GS}$. This would lead to incorrect gate drive levels, unreliable switching behavior, and potential overstress of the MOSFET gate oxide.
+
+\subsection{Floating Gate Drive Requirement}
+
+To properly drive a high-side MOSFET, the gate driver supply must be referenced to the MOSFET source terminal and must therefore float with the switching node. This floating behavior ensures that the required positive gate-to-source voltage is maintained regardless of the instantaneous source voltage.
+
+An isolated DC--DC converter provides this floating supply by electrically decoupling the gate-drive power domain from the control and system ground. The isolation prevents ground loops, eliminates common-mode voltage stress on the control circuitry, and allows the gate driver output to move together with the MOSFET source node.
+
+\subsection{Role of Isolation in System Safety and Reliability}
+
+In addition to enabling correct high-side operation, galvanic isolation improves system safety and robustness. The isolation barrier protects low-voltage control electronics from high-voltage transients present in the power stage and prevents destructive current paths caused by ground potential differences. Therefore, the isolated DC--DC converter is not an optional design choice but a functional requirement imposed by the high-side switching configuration.
+
+\section{Circuit Description and Design Calculations}
+
+\subsection{Input Stage: Microcontroller to TLP250}
+
+A $330\,\Omega$ resistor is connected between the Arduino PWM output ($5\,\text{V}$) and the TLP250 LED input to limit the forward current:
+
+\[
+I_F = \frac{V_{IN} - V_F}{R_{in}} 
+     = \frac{5 - 1.6}{330}
+     \approx \SI{10.3}{mA}
+\]
+
+This current exceeds the minimum required input current of $\SI{5}{mA}$, ensuring reliable optocoupler activation over temperature and supply variations.
+
+\subsection{Output Stage: TLP250 to MOSFET Gate}
+
+An $18\,\Omega$ gate resistor ($R_G$) is placed between the TLP250 output pins and the MOSFET gate to limit the peak gate current and control switching transients.
+
+\[
+I_{g,peak} \approx \frac{V_{CC}}{R_G}
+              = \frac{15}{18}
+              \approx \SI{0.83}{A}
+\]
+
+This current level remains safely below the TLP250 maximum peak current rating.
+
+\subsection{Gate Charge and Turn-On Time Analysis}
+
+MOSFET switching behavior is governed by the total gate charge. According to the datasheet:
+
+\[
+Q_g = \SI{140}{nC}
+\]
+
+The turn-on transition time can be estimated as:
+
+\[
+t_{on} \approx \frac{Q_g}{I_{g,peak}}
+           = \frac{140\,\text{nC}}{0.83\,\text{A}}
+           \approx \SI{169}{ns}
+\]
+
+This value includes the gate-to-source charging interval, the Miller plateau, and the post-Miller gate voltage rise.
+
+\subsection{Turn-Off Behavior}
+
+During turn-off, the gate charge is discharged through the same gate resistor. Given the switching frequency of $\SI{2}{kHz}$, the available off-time of approximately $\SI{75}{\mu s}$ is several orders of magnitude longer than the required discharge time, ensuring full turn-off before the next switching cycle.
+
+\subsection{Power Supply Decoupling}
+
+Local decoupling capacitors are placed between $V_{CC}$ and GND of the TLP250:
+
+\begin{itemize}
+    \item $0.1\,\mu\text{F}$ ceramic capacitor for high-frequency decoupling
+    \item $0.47\,\mu\text{F}$ capacitor acting as a local energy buffer
+\end{itemize}
+
+\section{Conclusion}
+
+The analysis demonstrates that the TLP250 optocoupler is suitable for driving the IXFH80N65X2 MOSFET in a high-side switching configuration at a switching frequency of $\SI{2}{kHz}$. The use of an isolated DC--DC converter is essential to provide a floating gate-drive supply, eliminate grounding conflicts, and ensure a well-defined gate-to-source voltage under all operating conditions. By correctly accounting for the total gate charge of $\SI{140}{nC}$, the estimated switching times remain negligible relative to the switching period, confirming the validity and robustness of the proposed gate drive design.
+
+\end{document}
