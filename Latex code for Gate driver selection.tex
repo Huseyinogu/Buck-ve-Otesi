@@ -1,0 +1,129 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{amsmath}
+\usepackage{siunitx}
+\usepackage{geometry}
+\usepackage{setspace}
+
+\geometry{margin=2.5cm}
+\onehalfspacing
+
+\title{Evaluation of the TLP250 Optocoupler as a Gate Driver for the IXFH80N65X2 MOSFET}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+This report presents a detailed technical evaluation of the TLP250 optocoupler used as a gate driver for the IXFH80N65X2 power MOSFET. The system operates at a switching frequency ($f_{sw}$) of $\SI{2}{kHz}$ with a high duty cycle of $0.85$. An isolated DC--DC converter supplies the gate driver with $+15\,\text{V}$, providing galvanic isolation between the control and power stages. The design focuses on ensuring reliable gate drive operation, acceptable switching speed, and safe current levels for both the optocoupler and the MOSFET.
+
+\section{Component and Supply Parameters}
+
+\subsection{MOSFET: IXFH80N65X2}
+
+\begin{itemize}
+    \item Drain--source voltage rating: $V_{DSS} = \SI{650}{V}$
+    \item Continuous drain current at $25^\circ\text{C}$: $I_{D25} = \SI{80}{A}$
+    \item Gate threshold voltage: $V_{GS(th)} = 3.5\text{--}5.0\,\text{V}$
+    \item Gate-to-source charge: $Q_{gs} \approx \SI{50}{nC}$
+    \item Gate-to-drain (Miller) charge: $Q_{gd} \approx \SI{40}{nC}$
+    \item Total gate charge (datasheet, $V_{GS}=10\,\text{V}$): 
+    \[
+        Q_g \approx \SI{140}{nC}
+    \]
+\end{itemize}
+
+\subsection{Gate Driver: TLP250}
+
+\begin{itemize}
+    \item Maximum peak output current: $I_O = \pm \SI{1.5}{A}$
+    \item Maximum input threshold current: $I_{FLH} = \SI{5}{mA}$
+    \item Typical LED forward voltage: $V_F \approx \SI{1.6}{V}$
+\end{itemize}
+
+\subsection{Gate Drive Supply}
+
+An isolated DC--DC converter provides $+15\,\text{V}$ and GND for the gate driver supply.
+
+\section{Circuit Description and Design Calculations}
+
+\subsection{Input Stage: Microcontroller to TLP250}
+
+A $330\,\Omega$ resistor is connected between the Arduino PWM output ($5\,\text{V}$) and the TLP250 LED input to limit the forward current:
+
+\[
+I_F = \frac{V_{IN} - V_F}{R_{in}} 
+     = \frac{5 - 1.6}{330}
+     \approx \SI{10.3}{mA}
+\]
+
+This current exceeds the minimum required input current of $\SI{5}{mA}$, ensuring reliable optocoupler activation over temperature and supply variations while remaining within safe limits for the microcontroller output pin.
+
+\subsection{Output Stage: TLP250 to MOSFET Gate}
+
+An $18\,\Omega$ gate resistor ($R_G$) is placed between the TLP250 output pins and the MOSFET gate. The resistor limits the peak gate current and helps control switching transients.
+
+Assuming a first-order approximation, the peak gate current is:
+
+\[
+I_{g,peak} \approx \frac{V_{CC}}{R_G}
+              = \frac{15}{18}
+              \approx \SI{0.83}{A}
+\]
+
+This value is comfortably below the TLP250 maximum peak current rating of $\pm \SI{1.5}{A}$. In practice, the effective gate current is slightly lower due to the driver’s internal output impedance and saturation voltage.
+
+\subsection{Gate Charge and Turn-On Time Analysis}
+
+MOSFET switching speed is governed by the total gate charge rather than only the gate-to-source or Miller charge. According to the datasheet, the IXFH80N65X2 requires approximately:
+
+\[
+Q_g = \SI{140}{nC}
+\]
+
+to raise the gate voltage from $0\,\text{V}$ to the nominal drive level.
+
+Using the estimated peak gate current, the turn-on transition time can be approximated as:
+
+\[
+t_{on} \approx \frac{Q_g}{I_{g,peak}}
+           = \frac{140\,\text{nC}}{0.83\,\text{A}}
+           \approx \SI{169}{ns}
+\]
+
+This time includes gate charging up to threshold, the Miller plateau during drain voltage transition, and the post-Miller gate voltage rise.
+
+\subsection{Turn-Off Behavior}
+
+During turn-off, the same $18\,\Omega$ resistor limits the gate discharge current. The TLP250 provides sufficient sink capability to remove the stored gate charge within a comparable time scale. Given the switching frequency of $\SI{2}{kHz}$, the available off-time is:
+
+\[
+t_{off} = (1 - 0.85) \times 500\,\mu\text{s} \approx \SI{75}{\mu s}
+\]
+
+which is several orders of magnitude longer than the required gate discharge time.
+
+\subsection{Power Supply Decoupling}
+
+Local decoupling capacitors are placed between $V_{CC}$ and GND of the TLP250:
+
+\begin{itemize}
+    \item $0.1\,\mu\text{F}$ ceramic capacitor for high-frequency decoupling
+    \item $0.47\,\mu\text{F}$ capacitor acting as a local energy buffer
+\end{itemize}
+
+The primary bulk energy storage is assumed to be provided by the DC--DC converter output capacitance.
+
+\section{Discussion}
+
+Using the datasheet-defined total gate charge of $\SI{140}{nC}$ yields a more realistic estimate of the MOSFET switching behavior than considering only $Q_{gs}$ and $Q_{gd}$. Although $Q_{gs}+Q_{gd}$ accounts for the majority of the switching event, neglecting the remaining portion leads to an optimistic underestimation of the turn-on time. Incorporating the full gate charge improves quantitative accuracy without altering the overall design conclusions.
+
+\section{Conclusion}
+
+The analysis confirms that the TLP250 optocoupler is suitable for driving the IXFH80N65X2 MOSFET at a switching frequency of $\SI{2}{kHz}$ and a duty cycle of $0.85$. The $330\,\Omega$ input resistor ensures reliable optocoupler activation with a forward current of approximately $\SI{10.3}{mA}$. The $18\,\Omega$ gate resistor limits the peak gate current to about $\SI{0.83}{A}$, remaining within safe operating limits while enabling rapid gate charge transfer.
+
+By correctly accounting for the total gate charge of $\SI{140}{nC}$, the estimated turn-on time is approximately $\SI{170}{ns}$, which is negligible compared to the $\SI{500}{\mu s}$ switching period. Adequate turn-off margin and proper supply decoupling ensure stable and reliable operation of the gate drive circuit under the specified conditions.
+
+\end{document}
